@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AstroVault</title>
+<style>
+:root {
+  --bg:        #080c18;
+  --bg2:       #0e1220;
+  --card:      #111827;
+  --card-h:    #182034;
+  --border:    #1e2d48;
+  --accent:    #38bdf8;
+  --accent2:   #818cf8;
+  --success:   #34d399;
+  --warn:      #fbbf24;
+  --danger:    #f87171;
+  --text:      #e2e8f0;
+  --dim:       #94a3b8;
+  --dimmer:    #475569;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; }
+
+/* ── Header ── */
+header {
+  position: fixed; top: 0; left: 0; right: 0; height: 58px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 24px; padding: 0 20px; z-index: 200;
+}
+.logo { font-size: 1.2rem; font-weight: 700; color: var(--accent); white-space: nowrap; letter-spacing: -.5px; }
+.logo span { color: var(--accent2); }
+nav { display: flex; gap: 4px; }
+.nav-btn {
+  background: none; border: none; color: var(--dim); padding: 6px 14px;
+  border-radius: 6px; cursor: pointer; font-size: .9rem; transition: background .15s, color .15s;
+}
+.nav-btn:hover { background: var(--card); color: var(--text); }
+.nav-btn.active { background: var(--card); color: var(--accent); font-weight: 600; }
+.header-spacer { flex: 1; }
+.stats-badge {
+  font-size: .8rem; color: var(--dim); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px;
+}
+.stats-badge b { color: var(--success); }
+
+/* ── Views ── */
+main { padding-top: 58px; min-height: 100vh; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Gallery ── */
+#view-gallery .toolbar {
+  display: flex; gap: 10px; padding: 14px 20px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); background: var(--bg2);
+}
+.toolbar input[type=text] {
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 12px; border-radius: 6px; font-size: .85rem; width: 180px;
+}
+.toolbar input[type=text]::placeholder { color: var(--dimmer); }
+.toolbar select {
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 10px; border-radius: 6px; font-size: .85rem; cursor: pointer;
+}
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px; padding: 18px 20px;
+}
+.photo-card {
+  aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; cursor: pointer;
+  position: relative; background: var(--card); border: 1px solid var(--border);
+  transition: transform .2s, border-color .2s;
+}
+.photo-card:hover { transform: scale(1.02); border-color: var(--accent); }
+.photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-card .card-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,.85));
+  padding: 28px 10px 8px; opacity: 0; transition: opacity .2s;
+}
+.photo-card:hover .card-overlay { opacity: 1; }
+.card-overlay .obj-name { font-size: .8rem; font-weight: 600; color: #fff; }
+.card-overlay .obj-date { font-size: .73rem; color: var(--dim); margin-top: 2px; }
+.no-photo-card {
+  aspect-ratio: 4/3; border-radius: 8px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; background: var(--card);
+  border: 1px dashed var(--border); color: var(--dimmer); font-size: .8rem; gap: 6px;
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 60vh; gap: 14px; color: var(--dim); text-align: center; padding: 40px;
+}
+.empty-state .empty-icon { font-size: 3.5rem; line-height: 1; }
+.empty-state p { font-size: .95rem; }
+.empty-state button { margin-top: 4px; }
+
+/* ── Objects view ── */
+#view-objects { padding: 0; }
+.objects-toolbar {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg2);
+}
+.progress-bar-wrap { display: flex; align-items: center; gap: 10px; }
+.progress-label { font-size: .8rem; color: var(--dim); white-space: nowrap; }
+.progress-bar-bg {
+  flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; max-width: 220px;
+}
+.progress-bar-fill { height: 100%; background: var(--success); border-radius: 3px; transition: width .4s; }
+.tab-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--dim);
+  padding: 5px 14px; border-radius: 20px; cursor: pointer; font-size: .82rem; transition: all .15s;
+}
+.tab-btn:hover { border-color: var(--accent); color: var(--text); }
+.tab-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.chip-btn {
+  background: none; border: 1px solid var(--border); color: var(--dim);
+  padding: 4px 10px; border-radius: 20px; cursor: pointer; font-size: .78rem; transition: all .15s;
+}
+.chip-btn:hover { border-color: var(--accent2); color: var(--text); }
+.chip-btn.active { border-color: var(--accent2); background: var(--accent2); color: #fff; }
+.filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.filter-row input[type=text] {
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 5px 12px; border-radius: 6px; font-size: .83rem; margin-left: auto;
+}
+.objects-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px; padding: 18px 20px;
+}
+.obj-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.obj-card:hover { border-color: var(--accent); background: var(--card-h); }
+.obj-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.obj-designation { font-weight: 700; font-size: .95rem; color: var(--accent); }
+.obj-status-badge {
+  font-size: .72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+}
+.badge-done { background: rgba(52,211,153,.15); color: var(--success); }
+.badge-todo { background: rgba(148,163,184,.1); color: var(--dimmer); }
+.obj-name-line { font-size: .85rem; color: var(--text); margin-bottom: 4px; }
+.obj-meta-line { font-size: .78rem; color: var(--dim); display: flex; gap: 8px; }
+.obj-type-chip {
+  display: inline-block; font-size: .7rem; padding: 1px 7px; border-radius: 10px;
+  border: 1px solid var(--border); color: var(--dimmer); margin-top: 6px;
+}
+.obj-stats { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; gap: 14px; }
+.obj-stat { font-size: .78rem; color: var(--dim); }
+.obj-stat b { color: var(--text); }
+
+/* ── Add session form ── */
+#view-add { padding: 30px 20px; max-width: 680px; margin: 0 auto; }
+#view-add h2 { font-size: 1.3rem; color: var(--accent); margin-bottom: 24px; }
+.form-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+.form-section h3 { font-size: .9rem; color: var(--accent2); font-weight: 600; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+.form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.form-row:last-child { margin-bottom: 0; }
+.form-row label { font-size: .82rem; color: var(--dim); }
+.form-row input[type=text],
+.form-row input[type=date],
+.form-row input[type=number],
+.form-row textarea,
+.form-row select {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 6px; font-size: .88rem; width: 100%;
+  transition: border-color .15s;
+}
+.form-row input:focus,
+.form-row textarea:focus,
+.form-row select:focus { outline: none; border-color: var(--accent); }
+.form-row input::placeholder,
+.form-row textarea::placeholder { color: var(--dimmer); }
+.form-row textarea { resize: vertical; min-height: 70px; }
+.time-row { display: flex; gap: 8px; align-items: center; }
+.time-row input { flex: 1; }
+.time-row span { color: var(--dim); font-size: .85rem; }
+
+/* object search */
+.obj-search-wrap { position: relative; }
+.obj-search-input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 9px 12px; border-radius: 6px; font-size: .88rem; width: 100%;
+}
+.obj-search-input:focus { outline: none; border-color: var(--accent); }
+.obj-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  max-height: 240px; overflow-y: auto; z-index: 50; display: none;
+}
+.obj-dropdown.open { display: block; }
+.obj-dropdown-item {
+  padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border);
+  font-size: .85rem; transition: background .1s;
+}
+.obj-dropdown-item:last-child { border-bottom: none; }
+.obj-dropdown-item:hover { background: var(--card-h); }
+.obj-dropdown-item .di-main { color: var(--text); }
+.obj-dropdown-item .di-sub { font-size: .75rem; color: var(--dim); margin-top: 1px; }
+.obj-dropdown-item.add-new { color: var(--accent); font-style: italic; }
+.selected-obj-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(56,189,248,.1); border: 1px solid rgba(56,189,248,.3);
+  border-radius: 6px; padding: 8px 12px; margin-top: 8px;
+}
+.selected-obj-pill span { flex: 1; font-size: .88rem; }
+.selected-obj-pill button {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 0 4px;
+}
+.selected-obj-pill button:hover { color: var(--danger); }
+
+/* new object sub-form */
+.new-obj-form {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; margin-top: 10px; display: none;
+}
+.new-obj-form.open { display: block; }
+.new-obj-form h4 { font-size: .8rem; color: var(--accent2); margin-bottom: 10px; text-transform: uppercase; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* upload area */
+.upload-area {
+  border: 2px dashed var(--border); border-radius: 8px; padding: 28px 20px;
+  text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+  color: var(--dim); font-size: .88rem;
+}
+.upload-area:hover, .upload-area.drag-over { border-color: var(--accent); background: rgba(56,189,248,.05); color: var(--text); }
+.upload-area .upload-icon { font-size: 2rem; margin-bottom: 6px; }
+.upload-area label { color: var(--accent); cursor: pointer; text-decoration: underline; }
+.upload-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.preview-thumb {
+  width: 80px; height: 60px; object-fit: cover; border-radius: 5px;
+  border: 1px solid var(--border); cursor: pointer;
+}
+.preview-item { position: relative; }
+.preview-remove {
+  position: absolute; top: -5px; right: -5px; background: var(--danger);
+  border: none; color: #fff; border-radius: 50%; width: 18px; height: 18px;
+  font-size: .7rem; cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px;
+  border: none; border-radius: 7px; cursor: pointer; font-size: .88rem; font-weight: 600;
+  transition: opacity .15s, background .15s;
+}
+.btn:hover { opacity: .88; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #000; }
+.btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+.btn-danger { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.3); color: var(--danger); }
+.btn-success { background: var(--success); color: #000; }
+.form-actions { display: flex; gap: 10px; margin-top: 6px; }
+
+/* ── Lightbox ── */
+.lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,.96); z-index: 500;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.lightbox.hidden { display: none; }
+.lb-top {
+  position: absolute; top: 0; left: 0; right: 0; padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(rgba(0,0,0,.7), transparent);
+}
+.lb-title { flex: 1; font-size: 1rem; font-weight: 600; }
+.lb-counter { color: var(--dim); font-size: .85rem; }
+.lb-close {
+  background: none; border: none; color: var(--dim); font-size: 1.5rem;
+  cursor: pointer; line-height: 1; padding: 4px 8px;
+}
+.lb-close:hover { color: var(--text); }
+.lb-img-wrap {
+  display: flex; align-items: center; gap: 16px;
+  max-width: 100vw; padding: 70px 16px 140px;
+}
+.lb-img {
+  max-width: calc(100vw - 120px); max-height: calc(100vh - 220px);
+  object-fit: contain; border-radius: 4px; user-select: none;
+}
+.lb-arrow {
+  background: rgba(255,255,255,.08); border: none; color: #fff; font-size: 1.6rem;
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background .15s;
+}
+.lb-arrow:hover { background: rgba(255,255,255,.18); }
+.lb-arrow:disabled { opacity: .25; cursor: not-allowed; }
+.lb-meta {
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 14px 24px 20px;
+  background: linear-gradient(transparent, rgba(0,0,0,.8));
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+}
+.lb-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.lb-meta-label { font-size: .7rem; color: var(--dimmer); text-transform: uppercase; letter-spacing: .5px; }
+.lb-meta-value { font-size: .88rem; color: var(--text); }
+
+/* ── Object detail modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 300;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto;
+}
+.modal-overlay.hidden { display: none; }
+.modal-box {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  width: 100%; max-width: 680px; padding: 28px;
+}
+.modal-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.modal-title { flex: 1; }
+.modal-title h2 { font-size: 1.3rem; color: var(--accent); }
+.modal-title .modal-subtitle { color: var(--dim); font-size: .85rem; margin-top: 3px; }
+.modal-close { background: none; border: none; color: var(--dim); font-size: 1.4rem; cursor: pointer; }
+.modal-close:hover { color: var(--text); }
+.modal-section { margin-bottom: 20px; }
+.modal-section h4 { font-size: .8rem; color: var(--accent2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.session-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.session-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.session-date { font-weight: 600; font-size: .9rem; }
+.session-time-badge {
+  background: rgba(56,189,248,.15); color: var(--accent);
+  font-size: .75rem; padding: 2px 8px; border-radius: 10px;
+}
+.session-detail-row { font-size: .8rem; color: var(--dim); margin-bottom: 4px; }
+.session-detail-row b { color: var(--text); }
+.session-photo-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.session-photo-thumb {
+  width: 72px; height: 54px; object-fit: cover; border-radius: 5px;
+  border: 1px solid var(--border); cursor: pointer; transition: border-color .15s;
+}
+.session-photo-thumb:hover { border-color: var(--accent); }
+.session-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 900;
+  padding: 10px 18px; border-radius: 8px; font-size: .88rem; font-weight: 500;
+  animation: slideIn .25s ease; pointer-events: none;
+}
+.toast-success { background: var(--success); color: #000; }
+.toast-error { background: var(--danger); color: #fff; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dimmer); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#9880; Astro<span>Vault</span></div>
+  <nav>
+    <button class="nav-btn active" onclick="navigate('gallery')">Gallery</button>
+    <button class="nav-btn" onclick="navigate('objects')">Objects</button>
+    <button class="nav-btn" onclick="navigate('add')">Add Session</button>
+  </nav>
+  <div class="header-spacer"></div>
+  <div class="stats-badge" id="header-stats"><b>0</b> / 110 Messier</div>
+</header>
+
+<main>
+
+<!-- ── GALLERY ── -->
+<div id="view-gallery" class="view active">
+  <div class="toolbar">
+    <input type="text" id="gallery-search" placeholder="Search objects..." oninput="renderGallery()">
+    <select id="gallery-type" onchange="renderGallery()">
+      <option value="">All types</option>
+      <option>Galaxy</option>
+      <option>Nebula</option>
+      <option>Globular Cluster</option>
+      <option>Open Cluster</option>
+      <option>Planetary Nebula</option>
+      <option>Reflection Nebula</option>
+      <option>Supernova Remnant</option>
+    </select>
+    <select id="gallery-sort" onchange="renderGallery()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="name">Object name</option>
+    </select>
+  </div>
+  <div class="gallery-grid" id="gallery-grid"></div>
+</div>
+
+<!-- ── OBJECTS ── -->
+<div id="view-objects" class="view">
+  <div class="objects-toolbar">
+    <div class="progress-bar-wrap">
+      <span class="progress-label" id="progress-label">Messier: 0 / 110</span>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div class="tab-row">
+      <button class="tab-btn active" data-status="all" onclick="setObjStatus(this,'all')">All</button>
+      <button class="tab-btn" data-status="photographed" onclick="setObjStatus(this,'photographed')">Photographed</button>
+      <button class="tab-btn" data-status="remaining" onclick="setObjStatus(this,'remaining')">Remaining</button>
+    </div>
+    <div class="filter-row" id="type-chips">
+      <button class="chip-btn active" data-type="" onclick="setObjType(this,'')">All</button>
+      <button class="chip-btn" data-type="Galaxy" onclick="setObjType(this,'Galaxy')">Galaxy</button>
+      <button class="chip-btn" data-type="Nebula" onclick="setObjType(this,'Nebula')">Nebula</button>
+      <button class="chip-btn" data-type="Globular Cluster" onclick="setObjType(this,'Globular Cluster')">Globular Cluster</button>
+      <button class="chip-btn" data-type="Open Cluster" onclick="setObjType(this,'Open Cluster')">Open Cluster</button>
+      <button class="chip-btn" data-type="Planetary Nebula" onclick="setObjType(this,'Planetary Nebula')">Planetary Nebula</button>
+      <input type="text" id="obj-search-filter" placeholder="Search..." oninput="renderObjects()" style="margin-left:auto">
+    </div>
+  </div>
+  <div class="objects-grid" id="objects-grid"></div>
+</div>
+
+<!-- ── ADD SESSION ── -->
+<div id="view-add" class="view">
+  <h2>Log Imaging Session</h2>
+  <form id="add-form" onsubmit="submitSession(event)">
+
+    <div class="form-section">
+      <h3>Target Object</h3>
+      <div class="obj-search-wrap">
+        <input type="text" class="obj-search-input" id="obj-search-input"
+               placeholder="Search by name, M#, or NGC#..."
+               oninput="filterObjDropdown()" onfocus="openDropdown()" autocomplete="off">
+        <div class="obj-dropdown" id="obj-dropdown"></div>
+      </div>
+      <div class="selected-obj-pill" id="selected-obj-pill" style="display:none">
+        <span id="selected-obj-label"></span>
+        <button type="button" onclick="clearSelectedObj()">&#x2715;</button>
+      </div>
+      <input type="hidden" id="form-object-id" name="object_id">
+
+      <div class="new-obj-form" id="new-obj-form">
+        <h4>Add New Object</h4>
+        <div class="two-col">
+          <div class="form-row">
+            <label>Messier #</label>
+            <input type="number" id="new-m" min="1" max="110" placeholder="e.g. 42">
+          </div>
+          <div class="form-row">
+            <label>NGC #</label>
+            <input type="number" id="new-ngc" min="1" placeholder="e.g. 1976">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Common Name</label>
+          <input type="text" id="new-name" placeholder="e.g. Orion Nebula">
+        </div>
+        <div class="two-col">
+          <div class="form-row">
+            <label>Type</label>
+            <select id="new-type">
+              <option>Galaxy</option>
+              <option>Nebula</option>
+              <option>Reflection Nebula</option>
+              <option>Globular Cluster</option>
+              <option>Open Cluster</option>
+              <option>Planetary Nebula</option>
+              <option>Supernova Remnant</option>
+              <option>Star Cloud</option>
+              <option>Double Star</option>
+              <option>Asterism</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Constellation</label>
+            <input type="text" id="new-const" placeholder="e.g. Orion">
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addNewObject()" style="margin-top:4px">Add &amp; Select</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Session Details</h3>
+      <div class="form-row">
+        <label>Date Imaged</label>
+        <input type="date" id="form-date" name="date_taken">
+      </div>
+      <div class="form-row">
+        <label>Integration Time</label>
+        <div class="time-row">
+          <input type="number" name="integration_hours" id="form-hours" min="0" placeholder="0" style="width:80px">
+          <span>h</span>
+          <input type="number" name="integration_minutes_part" id="form-mins" min="0" max="59" placeholder="0" style="width:80px">
+          <span>m</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Telescope / Optics</label>
+        <input type="text" name="telescope" placeholder="e.g. Celestron EdgeHD 8&quot;">
+      </div>
+      <div class="form-row">
+        <label>Camera</label>
+        <input type="text" name="camera" placeholder="e.g. ZWO ASI294MC Pro">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea name="notes" placeholder="Seeing, filters, bortle, etc."></textarea>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Photos (optional)</h3>
+      <div class="upload-area" id="upload-area"
+           ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)"
+           onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">&#128247;</div>
+        <div>Drop images here or <label for="file-input" onclick="event.stopPropagation()">browse</label></div>
+        <div style="font-size:.75rem;margin-top:4px;color:var(--dimmer)">JPG, PNG, TIFF, WebP</div>
+      </div>
+      <input type="file" id="file-input" multiple accept="image/*" style="display:none" onchange="addFilesFromInput()">
+      <div class="upload-preview" id="upload-preview"></div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" id="submit-btn">Save Session</button>
+      <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear</button>
+    </div>
+  </form>
+</div>
+
+</main>
+
+<!-- ── LIGHTBOX ── -->
+<div class="lightbox hidden" id="lightbox"
+     ontouchstart="lbTouchStart(event)" ontouchend="lbTouchEnd(event)">
+  <div class="lb-top">
+    <div class="lb-title" id="lb-title"></div>
+    <div class="lb-counter" id="lb-counter"></div>
+    <button class="lb-close" onclick="closeLightbox()">&#x2715;</button>
+  </div>
+  <div class="lb-img-wrap">
+    <button class="lb-arrow" id="lb-prev" onclick="lbPrev()">&#8249;</button>
+    <img class="lb-img" id="lb-img" src="" alt="" draggable="false">
+    <button class="lb-arrow" id="lb-next" onclick="lbNext()">&#8250;</button>
+  </div>
+  <div class="lb-meta" id="lb-meta"></div>
+</div>
+
+<!-- ── OBJECT DETAIL MODAL ── -->
+<div class="modal-overlay hidden" id="obj-modal" onclick="closeObjModal(event)">
+  <div class="modal-box" id="obj-modal-box">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h2 id="modal-title"></h2>
+        <div class="modal-subtitle" id="modal-subtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeObjModal()">&#x2715;</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  photos: [],
+  objects: [],
+  objStatus: 'all',
+  objType: '',
+  lbPhotos: [],
+  lbIdx: 0,
+  lbTouchX: 0,
+  pendingFiles: [],
+  currentObjId: null,
+};
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadPhotos(), loadObjects()]);
+  renderGallery();
+  updateHeaderStats();
+  const hash = location.hash.replace('#', '') || 'gallery';
+  navigate(hash, true);
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function navigate(view, skipHash) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('view-' + view);
+  if (!el) return;
+  el.classList.add('active');
+  const btn = document.querySelector(`.nav-btn[onclick="navigate('${view}')"]`);
+  if (btn) btn.classList.add('active');
+  if (!skipHash) history.replaceState(null, '', '#' + view);
+  if (view === 'gallery') renderGallery();
+  if (view === 'objects') renderObjects();
+}
+
+// ── Data loading ───────────────────────────────────────────────────────────
+async function loadPhotos() {
+  const res = await fetch('/api/gallery');
+  S.photos = await res.json();
+}
+async function loadObjects() {
+  const res = await fetch('/api/objects');
+  S.objects = await res.json();
+}
+
+function objDisplayName(o) {
+  const parts = [];
+  if (o.messier_number) parts.push('M' + o.messier_number);
+  if (o.ngc_number)     parts.push('NGC ' + o.ngc_number);
+  if (o.common_name)    parts.push(o.common_name);
+  return parts.join(' • ') || 'Object #' + o.id;
+}
+
+function photoObjName(p) {
+  const parts = [];
+  if (p.messier_number) parts.push('M' + p.messier_number);
+  if (p.ngc_number)     parts.push('NGC ' + p.ngc_number);
+  if (p.common_name)    parts.push(p.common_name);
+  return parts.join(' / ') || 'Unknown';
+}
+
+function fmtTime(mins) {
+  if (!mins) return '—';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+  if (h > 0) return h + 'h';
+  return m + 'm';
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'});
+}
+
+function updateHeaderStats() {
+  const done = S.objects.filter(o => o.messier_number && o.session_count > 0).length;
+  document.getElementById('header-stats').innerHTML = '<b>' + done + '</b> / 110 Messier';
+}
+
+// ── Gallery ────────────────────────────────────────────────────────────────
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  const search = (document.getElementById('gallery-search').value || '').toLowerCase();
+  const typeF = document.getElementById('gallery-type').value;
+  const sort  = document.getElementById('gallery-sort').value;
+
+  let photos = S.photos.filter(p => {
+    const name = photoObjName(p).toLowerCase();
+    if (search && !name.includes(search)) return false;
+    if (typeF && p.object_type !== typeF) return false;
+    return true;
+  });
+
+  if (sort === 'oldest') photos = photos.slice().reverse();
+  else if (sort === 'name') photos = photos.slice().sort((a,b) => photoObjName(a).localeCompare(photoObjName(b)));
+
+  S.lbPhotos = photos;
+
+  if (photos.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">&#127756;</div>' +
+      (S.photos.length === 0
+        ? '<p>No photos yet. Log your first imaging session!</p><button class="btn btn-primary" onclick="navigate(\'add\')">Add Session</button>'
+        : '<p>No photos match your filters.</p>') +
+      '</div>';
+    return;
+  }
+
+  grid.innerHTML = photos.map((p, i) => `
+    <div class="photo-card" onclick="openLightbox(${i})">
+      <img src="/thumbnails/${esc(p.thumbnail)}" alt="" loading="lazy">
+      <div class="card-overlay">
+        <div class="obj-name">${esc(photoObjName(p))}</div>
+        <div class="obj-date">${esc(fmtDate(p.date_taken))}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Lightbox ───────────────────────────────────────────────────────────────
+function openLightbox(idx) {
+  S.lbIdx = idx;
+  document.getElementById('lightbox').classList.remove('hidden');
+  renderLightbox();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function renderLightbox() {
+  const p = S.lbPhotos[S.lbIdx];
+  const total = S.lbPhotos.length;
+  document.getElementById('lb-img').src    = '/uploads/' + p.filename;
+  document.getElementById('lb-title').textContent  = photoObjName(p);
+  document.getElementById('lb-counter').textContent = (S.lbIdx + 1) + ' / ' + total;
+  document.getElementById('lb-prev').disabled = S.lbIdx === 0;
+  document.getElementById('lb-next').disabled = S.lbIdx === total - 1;
+
+  const metaItems = [
+    {label:'Date', value: fmtDate(p.date_taken)},
+    {label:'Integration', value: fmtTime(p.integration_minutes)},
+    {label:'Type', value: p.object_type || '—'},
+    {label:'Constellation', value: p.constellation || '—'},
+  ];
+  if (p.telescope) metaItems.push({label:'Telescope', value: p.telescope});
+  if (p.camera)    metaItems.push({label:'Camera', value: p.camera});
+
+  document.getElementById('lb-meta').innerHTML = metaItems.map(m =>
+    `<div class="lb-meta-item"><div class="lb-meta-label">${esc(m.label)}</div><div class="lb-meta-value">${esc(m.value)}</div></div>`
+  ).join('');
+}
+
+function lbPrev() { if (S.lbIdx > 0) { S.lbIdx--; renderLightbox(); } }
+function lbNext() { if (S.lbIdx < S.lbPhotos.length - 1) { S.lbIdx++; renderLightbox(); } }
+
+function lbTouchStart(e) { S.lbTouchX = e.changedTouches[0].screenX; }
+function lbTouchEnd(e) {
+  const dx = S.lbTouchX - e.changedTouches[0].screenX;
+  if (Math.abs(dx) > 50) { dx > 0 ? lbNext() : lbPrev(); }
+}
+
+document.addEventListener('keydown', e => {
+  if (document.getElementById('lightbox').classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft')  lbPrev();
+  if (e.key === 'ArrowRight') lbNext();
+  if (e.key === 'Escape')     closeLightbox();
+});
+
+// ── Objects ────────────────────────────────────────────────────────────────
+function setObjStatus(btn, status) {
+  S.objStatus = status;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderObjects();
+}
+
+function setObjType(btn, type) {
+  S.objType = type;
+  document.querySelectorAll('.chip-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderObjects();
+}
+
+function renderObjects() {
+  const search = (document.getElementById('obj-search-filter').value || '').toLowerCase();
+
+  // progress bar
+  const messierDone = S.objects.filter(o => o.messier_number && o.session_count > 0).length;
+  const pct = Math.round(messierDone / 110 * 100);
+  document.getElementById('progress-label').textContent = 'Messier: ' + messierDone + ' / 110 (' + pct + '%)';
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  let objs = S.objects.filter(o => {
+    if (S.objStatus === 'photographed' && o.session_count === 0) return false;
+    if (S.objStatus === 'remaining' && (o.session_count > 0 || !o.messier_number)) return false;
+    if (S.objType) {
+      const t = S.objType.toLowerCase();
+      if (!(o.object_type || '').toLowerCase().includes(t)) return false;
+    }
+    if (search) {
+      const hay = [
+        o.messier_number ? 'm'+o.messier_number : '',
+        o.ngc_number ? 'ngc '+o.ngc_number : '',
+        o.common_name || '',
+        o.constellation || '',
+        o.object_type || '',
+      ].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const grid = document.getElementById('objects-grid');
+  if (objs.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">&#128269;</div><p>No objects match your filters.</p></div>';
+    return;
+  }
+
+  grid.innerHTML = objs.map(o => {
+    const done = o.session_count > 0;
+    const desig = [];
+    if (o.messier_number) desig.push('<span style="color:var(--accent)">M' + o.messier_number + '</span>');
+    if (o.ngc_number)     desig.push('NGC ' + o.ngc_number);
+    const designStr = desig.join(' <span style="color:var(--dimmer)">/</span> ') || 'Object #' + o.id;
+
+    return `<div class="obj-card" onclick="openObjModal(${o.id})">
+      <div class="obj-card-header">
+        <div class="obj-designation">${designStr}</div>
+        <div class="obj-status-badge ${done ? 'badge-done' : 'badge-todo'}">${done ? '&#10003; Done' : '&#9675; Pending'}</div>
+      </div>
+      ${o.common_name ? `<div class="obj-name-line">${esc(o.common_name)}</div>` : ''}
+      <div class="obj-meta-line">
+        <span>${esc(o.constellation || '')}</span>
+      </div>
+      <span class="obj-type-chip">${esc(o.object_type || '')}</span>
+      ${done ? `<div class="obj-stats">
+        <div class="obj-stat"><b>${o.session_count}</b> session${o.session_count !== 1 ? 's' : ''}</div>
+        <div class="obj-stat"><b>${fmtTime(o.total_minutes)}</b> total</div>
+        <div class="obj-stat">Last: <b>${fmtDate(o.last_imaged)}</b></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Object detail modal ────────────────────────────────────────────────────
+async function openObjModal(id) {
+  S.currentObjId = id;
+  const res = await fetch('/api/objects/' + id);
+  const obj = await res.json();
+
+  const desig = [];
+  if (obj.messier_number) desig.push('M' + obj.messier_number);
+  if (obj.ngc_number)     desig.push('NGC ' + obj.ngc_number);
+  document.getElementById('modal-title').textContent = (obj.common_name || desig.join(' / ') || 'Object');
+  document.getElementById('modal-subtitle').textContent =
+    [desig.join(' / '), obj.object_type, obj.constellation].filter(Boolean).join(' • ');
+
+  let html = '';
+
+  if (obj.sessions.length === 0) {
+    html += '<div class="empty-state" style="min-height:120px"><p>No sessions logged yet.</p>' +
+      `<button class="btn btn-primary" onclick="closeObjModal();navigate('add');prefillObj(${obj.id})">Log Session</button></div>`;
+  } else {
+    html += '<div class="modal-section"><h4>Imaging Sessions</h4>';
+    obj.sessions.forEach(s => {
+      html += `<div class="session-card">
+        <div class="session-card-header">
+          <div class="session-date">${fmtDate(s.date_taken)}</div>
+          <div class="session-time-badge">${fmtTime(s.integration_minutes)}</div>
+        </div>`;
+      if (s.telescope) html += `<div class="session-detail-row">Telescope: <b>${esc(s.telescope)}</b></div>`;
+      if (s.camera)    html += `<div class="session-detail-row">Camera: <b>${esc(s.camera)}</b></div>`;
+      if (s.notes)     html += `<div class="session-detail-row">${esc(s.notes)}</div>`;
+      if (s.photos.length > 0) {
+        html += '<div class="session-photo-row">';
+        s.photos.forEach((p, pi) => {
+          html += `<img class="session-photo-thumb" src="/thumbnails/${esc(p.thumbnail)}"
+            onclick="openLightboxFromModal(${obj.id},${pi})" alt="">`;
+        });
+        html += '</div>';
+      }
+      html += `<div class="session-actions">
+        <button class="btn btn-danger" style="padding:5px 12px;font-size:.78rem"
+          onclick="deleteSession(${s.id})">Delete session</button>
+      </div></div>`;
+    });
+    html += '</div>';
+  }
+
+  html += `<div style="margin-top:12px">
+    <button class="btn btn-primary" onclick="closeObjModal();navigate('add');prefillObj(${obj.id})">&#43; Add Session</button>
+  </div>`;
+
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('obj-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeObjModal(e) {
+  if (e && e.target !== document.getElementById('obj-modal')) return;
+  document.getElementById('obj-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+async function openLightboxFromModal(objId, photoIdx) {
+  closeObjModal();
+  // find photos for this object in S.photos
+  const objPhotos = S.photos.filter(p => p.object_id === objId);
+  S.lbPhotos = objPhotos;
+  S.lbIdx = Math.min(photoIdx, objPhotos.length - 1);
+  openLightbox(S.lbIdx);
+}
+
+async function deleteSession(sessionId) {
+  if (!confirm('Delete this session and all its photos?')) return;
+  await fetch('/api/sessions/' + sessionId, {method: 'DELETE'});
+  toast('Session deleted');
+  await Promise.all([loadPhotos(), loadObjects()]);
+  updateHeaderStats();
+  openObjModal(S.currentObjId);
+}
+
+// ── Add session form ────────────────────────────────────────────────────────
+function filterObjDropdown() {
+  const q = document.getElementById('obj-search-input').value.toLowerCase().trim();
+  openDropdown();
+  renderDropdown(q);
+}
+
+function openDropdown() {
+  document.getElementById('obj-dropdown').classList.add('open');
+  renderDropdown(document.getElementById('obj-search-input').value.toLowerCase().trim());
+}
+
+function renderDropdown(q) {
+  const dd = document.getElementById('obj-dropdown');
+  if (!q) {
+    dd.classList.remove('open');
+    return;
+  }
+  const matches = S.objects.filter(o => {
+    const hay = [
+      o.messier_number ? 'm' + o.messier_number : '',
+      o.ngc_number ? 'ngc ' + o.ngc_number : '',
+      (o.common_name || '').toLowerCase(),
+      (o.constellation || '').toLowerCase(),
+    ].join(' ');
+    return hay.includes(q);
+  }).slice(0, 12);
+
+  let html = matches.map(o => {
+    const desig = [];
+    if (o.messier_number) desig.push('M' + o.messier_number);
+    if (o.ngc_number)     desig.push('NGC ' + o.ngc_number);
+    return `<div class="obj-dropdown-item" onclick="selectObj(${o.id})">
+      <div class="di-main">${esc(desig.join(' / '))}</div>
+      <div class="di-sub">${esc(o.common_name || '')} ${esc(o.object_type || '')} &bull; ${esc(o.constellation || '')}</div>
+    </div>`;
+  }).join('');
+
+  html += `<div class="obj-dropdown-item add-new" onclick="showNewObjForm()">&#43; Add new object&hellip;</div>`;
+  dd.innerHTML = html;
+  dd.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.obj-search-wrap')) {
+    document.getElementById('obj-dropdown').classList.remove('open');
+  }
+});
+
+function selectObj(id) {
+  const o = S.objects.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('form-object-id').value = id;
+  document.getElementById('obj-search-input').value = '';
+  document.getElementById('obj-dropdown').classList.remove('open');
+  document.getElementById('selected-obj-label').textContent = objDisplayName(o);
+  document.getElementById('selected-obj-pill').style.display = 'flex';
+  document.getElementById('new-obj-form').classList.remove('open');
+}
+
+function clearSelectedObj() {
+  document.getElementById('form-object-id').value = '';
+  document.getElementById('selected-obj-pill').style.display = 'none';
+}
+
+function showNewObjForm() {
+  document.getElementById('obj-dropdown').classList.remove('open');
+  document.getElementById('new-obj-form').classList.add('open');
+  document.getElementById('obj-search-input').value = '';
+}
+
+async function addNewObject() {
+  const payload = {
+    messier_number: parseInt(document.getElementById('new-m').value) || null,
+    ngc_number:     parseInt(document.getElementById('new-ngc').value) || null,
+    common_name:    document.getElementById('new-name').value.trim() || null,
+    object_type:    document.getElementById('new-type').value,
+    constellation:  document.getElementById('new-const').value.trim() || null,
+  };
+  if (!payload.messier_number && !payload.ngc_number && !payload.common_name) {
+    toast('Please enter at least one identifier.', 'error'); return;
+  }
+  const res = await fetch('/api/objects', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const data = await res.json();
+  await loadObjects();
+  updateHeaderStats();
+  const newObj = S.objects.find(o => o.id === data.id) || {id: data.id, ...payload};
+  selectObj(data.id);
+  document.getElementById('new-obj-form').classList.remove('open');
+  toast('Object added');
+}
+
+function prefillObj(id) {
+  setTimeout(() => {
+    selectObj(id);
+    // set today's date
+    document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+  }, 50);
+}
+
+// ── File upload ─────────────────────────────────────────────────────────────
+function dragOver(e)  { e.preventDefault(); document.getElementById('upload-area').classList.add('drag-over'); }
+function dragLeave(e) { document.getElementById('upload-area').classList.remove('drag-over'); }
+function dropFiles(e) {
+  e.preventDefault();
+  document.getElementById('upload-area').classList.remove('drag-over');
+  addFiles(e.dataTransfer.files);
+}
+function addFilesFromInput() { addFiles(document.getElementById('file-input').files); }
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    if (!f.type.startsWith('image/')) continue;
+    S.pendingFiles.push(f);
+  }
+  renderPreview();
+}
+
+function renderPreview() {
+  const wrap = document.getElementById('upload-preview');
+  wrap.innerHTML = '';
+  S.pendingFiles.forEach((f, i) => {
+    const url = URL.createObjectURL(f);
+    const div = document.createElement('div');
+    div.className = 'preview-item';
+    div.innerHTML = `<img class="preview-thumb" src="${url}" alt="">
+      <button class="preview-remove" onclick="removeFile(${i})">&#x2715;</button>`;
+    wrap.appendChild(div);
+  });
+}
+
+function removeFile(i) {
+  S.pendingFiles.splice(i, 1);
+  renderPreview();
+}
+
+// ── Form submit ─────────────────────────────────────────────────────────────
+async function submitSession(e) {
+  e.preventDefault();
+  const objId = document.getElementById('form-object-id').value;
+  if (!objId) { toast('Please select a target object.', 'error'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const form = document.getElementById('add-form');
+  const fd = new FormData(form);
+  fd.set('object_id', objId);
+  S.pendingFiles.forEach(f => fd.append('photos', f));
+
+  try {
+    const res = await fetch('/api/sessions', {method: 'POST', body: fd});
+    if (!res.ok) throw new Error('Server error');
+    toast('Session saved!');
+    await Promise.all([loadPhotos(), loadObjects()]);
+    updateHeaderStats();
+    resetForm();
+    navigate('gallery');
+  } catch {
+    toast('Failed to save. Please try again.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Session';
+  }
+}
+
+function resetForm() {
+  document.getElementById('add-form').reset();
+  clearSelectedObj();
+  S.pendingFiles = [];
+  renderPreview();
+  document.getElementById('new-obj-form').classList.remove('open');
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Start ───────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

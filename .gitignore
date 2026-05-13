@@ -1,0 +1,5 @@
+uploads/
+thumbnails/
+astrovault.db
+__pycache__/
+*.pyc
