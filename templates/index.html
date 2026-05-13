@@ -50,6 +50,59 @@ main { padding-top: 58px; min-height: 100vh; }
 .view { display: none; }
 .view.active { display: block; }
 
+/* ── Dashboard ── */
+#view-dash { padding: 20px; max-width: 960px; margin: 0 auto; }
+.dash-stats-row {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 20px;
+}
+.stat-card-value { font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
+.stat-card-value small { font-size: 1rem; color: var(--dim); font-weight: 400; }
+.stat-card-label { font-size: .74rem; color: var(--dim); margin-top: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.dash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 640px) { .dash-row { grid-template-columns: 1fr; } }
+.dash-section {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; margin-bottom: 16px;
+}
+.dash-section h3 {
+  font-size: .78rem; color: var(--accent2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px;
+}
+.big-progress { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
+.big-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 5px; transition: width .6s ease; width: 0%;
+}
+.type-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.type-label {
+  width: 160px; font-size: .78rem; color: var(--dim); text-align: right;
+  flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.type-bar-bg { flex: 1; height: 7px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.type-bar-fill { height: 100%; background: var(--accent2); border-radius: 4px; transition: width .5s ease; }
+.type-count { width: 28px; font-size: .78rem; color: var(--dim); text-align: right; flex-shrink: 0; }
+.recent-list { display: flex; flex-direction: column; gap: 8px; }
+.recent-item {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.recent-item:hover { border-color: var(--accent); background: var(--card-h); }
+.recent-thumb { width: 64px; height: 48px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
+.recent-thumb-empty {
+  width: 64px; height: 48px; background: var(--border); border-radius: 5px;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; color: var(--dimmer);
+}
+.recent-info { flex: 1; min-width: 0; }
+.recent-name { font-size: .9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-sub { font-size: .78rem; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ── Gallery ── */
 #view-gallery .toolbar {
   display: flex; gap: 10px; padding: 14px 20px; align-items: center; flex-wrap: wrap;
@@ -363,7 +416,8 @@ main { padding-top: 58px; min-height: 100vh; }
 <header>
   <div class="logo">&#9880; Astro<span>Vault</span></div>
   <nav>
-    <button class="nav-btn active" onclick="navigate('gallery')">Gallery</button>
+    <button class="nav-btn" onclick="navigate('dash')">Dashboard</button>
+    <button class="nav-btn" onclick="navigate('gallery')">Gallery</button>
     <button class="nav-btn" onclick="navigate('objects')">Objects</button>
     <button class="nav-btn" onclick="navigate('add')">Add Session</button>
   </nav>
@@ -373,18 +427,48 @@ main { padding-top: 58px; min-height: 100vh; }
 
 <main>
 
+<!-- ── DASHBOARD ── -->
+<div id="view-dash" class="view active">
+  <div id="view-dash-inner" style="padding:20px;max-width:960px;margin:0 auto">
+    <div class="dash-stats-row" id="dash-stats">
+      <div class="stat-card"><div class="stat-card-value">—</div><div class="stat-card-label">Messier Imaged</div></div>
+      <div class="stat-card"><div class="stat-card-value" style="color:var(--success)">—</div><div class="stat-card-label">Messier Complete</div></div>
+      <div class="stat-card"><div class="stat-card-value" style="color:var(--accent2)">—</div><div class="stat-card-label">Total Integration</div></div>
+      <div class="stat-card"><div class="stat-card-value" style="color:var(--warn)">—</div><div class="stat-card-label">Photos Stored</div></div>
+    </div>
+    <div class="dash-section">
+      <h3>Messier Catalog Progress</h3>
+      <div class="big-progress"><div class="big-progress-fill" id="dash-progress-fill"></div></div>
+      <div style="font-size:.82rem;color:var(--dim)" id="dash-progress-text">Loading…</div>
+    </div>
+    <div class="dash-row">
+      <div class="dash-section" style="margin-bottom:0">
+        <h3>By Object Type</h3>
+        <div id="dash-types"><div style="color:var(--dimmer);font-size:.85rem">No sessions yet.</div></div>
+      </div>
+      <div class="dash-section" style="margin-bottom:0">
+        <h3>Recent Sessions</h3>
+        <div class="recent-list" id="dash-recent">
+          <div style="color:var(--dimmer);font-size:.85rem">No sessions yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── GALLERY ── -->
-<div id="view-gallery" class="view active">
+<div id="view-gallery" class="view">
   <div class="toolbar">
     <input type="text" id="gallery-search" placeholder="Search objects..." oninput="renderGallery()">
     <select id="gallery-type" onchange="renderGallery()">
       <option value="">All types</option>
       <option>Galaxy</option>
       <option>Nebula</option>
+      <option>Emission Nebula</option>
+      <option>Reflection Nebula</option>
       <option>Globular Cluster</option>
       <option>Open Cluster</option>
       <option>Planetary Nebula</option>
-      <option>Reflection Nebula</option>
       <option>Supernova Remnant</option>
     </select>
     <select id="gallery-sort" onchange="renderGallery()">
@@ -462,6 +546,7 @@ main { padding-top: 58px; min-height: 100vh; }
             <select id="new-type">
               <option>Galaxy</option>
               <option>Nebula</option>
+              <option>Emission Nebula</option>
               <option>Reflection Nebula</option>
               <option>Globular Cluster</option>
               <option>Open Cluster</option>
@@ -568,6 +653,7 @@ main { padding-top: 58px; min-height: 100vh; }
 const S = {
   photos: [],
   objects: [],
+  stats: null,
   objStatus: 'all',
   objType: '',
   lbPhotos: [],
@@ -579,10 +665,11 @@ const S = {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadPhotos(), loadObjects()]);
+  await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
+  renderDash();
   renderGallery();
   updateHeaderStats();
-  const hash = location.hash.replace('#', '') || 'gallery';
+  const hash = location.hash.replace('#', '') || 'dash';
   navigate(hash, true);
 }
 
@@ -596,6 +683,7 @@ function navigate(view, skipHash) {
   const btn = document.querySelector(`.nav-btn[onclick="navigate('${view}')"]`);
   if (btn) btn.classList.add('active');
   if (!skipHash) history.replaceState(null, '', '#' + view);
+  if (view === 'dash')    renderDash();
   if (view === 'gallery') renderGallery();
   if (view === 'objects') renderObjects();
 }
@@ -609,11 +697,17 @@ async function loadObjects() {
   const res = await fetch('/api/objects');
   S.objects = await res.json();
 }
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    S.stats = await res.json();
+  } catch { S.stats = null; }
+}
 
 function objDisplayName(o) {
   const parts = [];
   if (o.messier_number) parts.push('M' + o.messier_number);
-  if (o.ngc_number)     parts.push('NGC ' + o.ngc_number);
+  if (o.ngc_number)     parts.push('NGC ' + o.ngc_number);
   if (o.common_name)    parts.push(o.common_name);
   return parts.join(' • ') || 'Object #' + o.id;
 }
@@ -621,7 +715,7 @@ function objDisplayName(o) {
 function photoObjName(p) {
   const parts = [];
   if (p.messier_number) parts.push('M' + p.messier_number);
-  if (p.ngc_number)     parts.push('NGC ' + p.ngc_number);
+  if (p.ngc_number)     parts.push('NGC ' + p.ngc_number);
   if (p.common_name)    parts.push(p.common_name);
   return parts.join(' / ') || 'Unknown';
 }
@@ -643,6 +737,74 @@ function fmtDate(d) {
 function updateHeaderStats() {
   const done = S.objects.filter(o => o.messier_number && o.session_count > 0).length;
   document.getElementById('header-stats').innerHTML = '<b>' + done + '</b> / 110 Messier';
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+function renderDash() {
+  if (!S.stats) return;
+  const st = S.stats;
+  const pct = st.messier_total > 0 ? Math.round(st.messier_done / st.messier_total * 100) : 0;
+  const totalH = Math.floor(st.total_minutes / 60);
+  const totalM = st.total_minutes % 60;
+  const timeStr = st.total_minutes === 0 ? '0m'
+    : totalH > 0 ? (totalH + 'h' + (totalM > 0 ? ' ' + totalM + 'm' : ''))
+    : totalM + 'm';
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-value">${st.messier_done}<small> / ${st.messier_total}</small></div>
+      <div class="stat-card-label">Messier Imaged</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-value" style="color:var(--success)">${pct}%</div>
+      <div class="stat-card-label">Messier Complete</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-value" style="color:var(--accent2)">${timeStr}</div>
+      <div class="stat-card-label">Total Integration</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-value" style="color:var(--warn)">${st.total_photos}</div>
+      <div class="stat-card-label">Photos Stored</div>
+    </div>`;
+
+  document.getElementById('dash-progress-fill').style.width = pct + '%';
+  document.getElementById('dash-progress-text').textContent =
+    st.messier_done + ' of ' + st.messier_total + ' Messier objects imaged (' + pct + '%)';
+
+  const maxCount = st.by_type.length > 0 ? Math.max(...st.by_type.map(t => t.count)) : 1;
+  document.getElementById('dash-types').innerHTML = st.by_type.length === 0
+    ? '<div style="color:var(--dimmer);font-size:.85rem">No sessions yet.</div>'
+    : st.by_type.map(t => `
+        <div class="type-row">
+          <div class="type-label">${esc(t.type || 'Unknown')}</div>
+          <div class="type-bar-bg"><div class="type-bar-fill" style="width:${Math.round(t.count / maxCount * 100)}%"></div></div>
+          <div class="type-count">${t.count}</div>
+        </div>`).join('');
+
+  document.getElementById('dash-recent').innerHTML = st.recent_sessions.length === 0
+    ? `<div style="color:var(--dimmer);font-size:.85rem">No sessions yet.</div>
+       <button class="btn btn-primary" style="margin-top:12px" onclick="navigate('add')">Log First Session</button>`
+    : st.recent_sessions.map(s => {
+        const nameParts = [];
+        if (s.messier_number) nameParts.push('M' + s.messier_number);
+        if (s.ngc_number)     nameParts.push('NGC ' + s.ngc_number);
+        const displayName = nameParts.join(' / ') || esc(s.common_name) || 'Object';
+        const sub = [s.common_name, s.constellation, s.object_type].filter(Boolean).join(' • ');
+        return `<div class="recent-item" onclick="openObjModal(${s.object_id})">
+          ${s.thumbnail
+            ? `<img class="recent-thumb" src="/thumbnails/${esc(s.thumbnail)}" alt="">`
+            : `<div class="recent-thumb-empty">&#9734;</div>`}
+          <div class="recent-info">
+            <div class="recent-name">${esc(displayName)}</div>
+            <div class="recent-sub">${esc(sub)}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:.85rem;color:var(--accent);font-weight:600">${fmtTime(s.integration_minutes)}</div>
+            <div style="font-size:.75rem;color:var(--dim);margin-top:2px">${fmtDate(s.date_taken)}</div>
+          </div>
+        </div>`;
+      }).join('');
 }
 
 // ── Gallery ────────────────────────────────────────────────────────────────
@@ -789,7 +951,7 @@ function renderObjects() {
     const done = o.session_count > 0;
     const desig = [];
     if (o.messier_number) desig.push('<span style="color:var(--accent)">M' + o.messier_number + '</span>');
-    if (o.ngc_number)     desig.push('NGC ' + o.ngc_number);
+    if (o.ngc_number)     desig.push('NGC ' + o.ngc_number);
     const designStr = desig.join(' <span style="color:var(--dimmer)">/</span> ') || 'Object #' + o.id;
 
     return `<div class="obj-card" onclick="openObjModal(${o.id})">
@@ -873,7 +1035,6 @@ function closeObjModal(e) {
 
 async function openLightboxFromModal(objId, photoIdx) {
   closeObjModal();
-  // find photos for this object in S.photos
   const objPhotos = S.photos.filter(p => p.object_id === objId);
   S.lbPhotos = objPhotos;
   S.lbIdx = Math.min(photoIdx, objPhotos.length - 1);
@@ -884,7 +1045,7 @@ async function deleteSession(sessionId) {
   if (!confirm('Delete this session and all its photos?')) return;
   await fetch('/api/sessions/' + sessionId, {method: 'DELETE'});
   toast('Session deleted');
-  await Promise.all([loadPhotos(), loadObjects()]);
+  await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
   updateHeaderStats();
   openObjModal(S.currentObjId);
 }
@@ -984,7 +1145,6 @@ async function addNewObject() {
 function prefillObj(id) {
   setTimeout(() => {
     selectObj(id);
-    // set today's date
     document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
   }, 50);
 }
@@ -1044,7 +1204,7 @@ async function submitSession(e) {
     const res = await fetch('/api/sessions', {method: 'POST', body: fd});
     if (!res.ok) throw new Error('Server error');
     toast('Session saved!');
-    await Promise.all([loadPhotos(), loadObjects()]);
+    await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
     updateHeaderStats();
     resetForm();
     navigate('gallery');

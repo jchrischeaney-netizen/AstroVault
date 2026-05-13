@@ -129,6 +129,49 @@ MESSIER_CATALOG = [
     (110, 205,   None,                     "Galaxy",            "Andromeda"),
 ]
 
+# Popular NGC objects without Messier numbers
+# (ngc_num, common_name, object_type, constellation)
+NGC_EXTRA_CATALOG = [
+    (869,  "Double Cluster h Per",     "Open Cluster",      "Perseus"),
+    (884,  "Double Cluster Chi Per",   "Open Cluster",      "Perseus"),
+    (891,  None,                       "Galaxy",            "Andromeda"),
+    (1499, "California Nebula",        "Emission Nebula",   "Perseus"),
+    (1502, "Kemble's Cascade",         "Open Cluster",      "Camelopardalis"),
+    (1977, "Running Man Nebula",       "Reflection Nebula", "Orion"),
+    (2237, "Rosette Nebula",           "Emission Nebula",   "Monoceros"),
+    (2244, "Rosette Cluster",          "Open Cluster",      "Monoceros"),
+    (2264, "Cone Nebula",              "Emission Nebula",   "Monoceros"),
+    (2359, "Thor's Helmet",            "Emission Nebula",   "Canis Major"),
+    (2392, "Eskimo Nebula",            "Planetary Nebula",  "Gemini"),
+    (3372, "Eta Carinae Nebula",       "Emission Nebula",   "Carina"),
+    (3532, "Wishing Well Cluster",     "Open Cluster",      "Carina"),
+    (3628, "Hamburger Galaxy",         "Galaxy",            "Leo"),
+    (4038, "Antennae Galaxies",        "Galaxy",            "Corvus"),
+    (4244, "Silver Needle Galaxy",     "Galaxy",            "Canes Venatici"),
+    (4449, None,                       "Galaxy",            "Canes Venatici"),
+    (4565, "Needle Galaxy",            "Galaxy",            "Coma Berenices"),
+    (4631, "Whale Galaxy",             "Galaxy",            "Canes Venatici"),
+    (5128, "Centaurus A",              "Galaxy",            "Centaurus"),
+    (5139, "Omega Centauri",           "Globular Cluster",  "Centaurus"),
+    (5907, "Splinter Galaxy",          "Galaxy",            "Draco"),
+    (6188, "Fighting Dragons Nebula",  "Emission Nebula",   "Ara"),
+    (6334, "Cat's Paw Nebula",         "Emission Nebula",   "Scorpius"),
+    (6357, "Lobster Nebula",           "Emission Nebula",   "Scorpius"),
+    (6822, "Barnard's Galaxy",         "Galaxy",            "Sagittarius"),
+    (6888, "Crescent Nebula",          "Emission Nebula",   "Cygnus"),
+    (6960, "Western Veil Nebula",      "Supernova Remnant", "Cygnus"),
+    (6992, "Eastern Veil Nebula",      "Supernova Remnant", "Cygnus"),
+    (6995, "Bat Nebula",               "Supernova Remnant", "Cygnus"),
+    (7000, "North America Nebula",     "Emission Nebula",   "Cygnus"),
+    (7023, "Iris Nebula",              "Reflection Nebula", "Cepheus"),
+    (7293, "Helix Nebula",             "Planetary Nebula",  "Aquarius"),
+    (7331, None,                       "Galaxy",            "Pegasus"),
+    (7380, "Wizard Nebula",            "Emission Nebula",   "Cepheus"),
+    (7479, None,                       "Galaxy",            "Pegasus"),
+    (7635, "Bubble Nebula",            "Emission Nebula",   "Cassiopeia"),
+    (7789, "Caroline's Rose",          "Open Cluster",      "Cassiopeia"),
+]
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -177,6 +220,12 @@ def init_db():
         conn.executemany(
             "INSERT INTO objects (messier_number, ngc_number, common_name, object_type, constellation) VALUES (?,?,?,?,?)",
             MESSIER_CATALOG,
+        )
+    cur = conn.execute("SELECT COUNT(*) FROM objects WHERE ngc_number IS NOT NULL AND messier_number IS NULL")
+    if cur.fetchone()[0] == 0:
+        conn.executemany(
+            "INSERT INTO objects (ngc_number, common_name, object_type, constellation) VALUES (?,?,?,?)",
+            NGC_EXTRA_CATALOG,
         )
     conn.commit()
     conn.close()
@@ -303,6 +352,47 @@ def api_update_object(obj_id):
     conn.commit()
     conn.close()
     return jsonify({'ok': True})
+
+
+@app.route('/api/stats')
+def api_stats():
+    conn = get_db()
+    m = conn.execute("""
+        SELECT
+            SUM(CASE WHEN o.messier_number IS NOT NULL THEN 1 ELSE 0 END) as total,
+            SUM(CASE WHEN o.messier_number IS NOT NULL AND s.cnt > 0 THEN 1 ELSE 0 END) as done
+        FROM objects o
+        LEFT JOIN (SELECT object_id, COUNT(*) as cnt FROM sessions GROUP BY object_id) s
+               ON o.id = s.object_id
+    """).fetchone()
+    t = conn.execute(
+        "SELECT COALESCE(SUM(integration_minutes),0) as m, COUNT(*) as c FROM sessions"
+    ).fetchone()
+    p = conn.execute("SELECT COUNT(*) as c FROM photos").fetchone()
+    by_type = conn.execute("""
+        SELECT o.object_type, COUNT(DISTINCT o.id) as count
+        FROM objects o JOIN sessions s ON o.id = s.object_id
+        GROUP BY o.object_type ORDER BY count DESC
+    """).fetchall()
+    recent = conn.execute("""
+        SELECT s.id, s.date_taken, s.integration_minutes,
+               o.id as object_id, o.messier_number, o.ngc_number,
+               o.common_name, o.object_type, o.constellation,
+               (SELECT p2.thumbnail FROM photos p2
+                WHERE p2.session_id = s.id ORDER BY p2.is_primary DESC LIMIT 1) as thumbnail
+        FROM sessions s JOIN objects o ON s.object_id = o.id
+        ORDER BY s.date_taken DESC NULLS LAST, s.created_at DESC LIMIT 6
+    """).fetchall()
+    conn.close()
+    return jsonify({
+        'messier_total': m['total'] or 110,
+        'messier_done':  m['done']  or 0,
+        'total_minutes': t['m'],
+        'total_sessions': t['c'],
+        'total_photos': p['c'],
+        'by_type': [dict(r) for r in by_type],
+        'recent_sessions': [dict(r) for r in recent],
+    })
 
 
 @app.route('/api/sessions', methods=['POST'])
