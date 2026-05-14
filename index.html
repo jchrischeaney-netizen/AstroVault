@@ -740,9 +740,12 @@ function makeThumbnail(file, maxSize = 600) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('canvas.toBlob returned null'));
+      }, 'image/jpeg', 0.85);
     };
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('Image failed to load: ' + file.name));
     img.src = url;
   });
 }
@@ -1326,32 +1329,44 @@ async function submitSession(e) {
     );
 
     const db = await openDB();
-    const tx = db.transaction(['sessions', 'photos'], 'readwrite');
 
-    const sessionId = await rq(tx.objectStore('sessions').add({
-      object_id: objId,
-      date_taken: document.getElementById('form-date').value || null,
-      integration_minutes: Math.round(hrs * 60) + mins,
-      telescope: document.getElementById('form-telescope').value.trim(),
-      camera:    document.getElementById('form-camera').value.trim(),
-      notes:     document.getElementById('form-notes').value.trim(),
-      created_at: new Date().toISOString(),
-    }));
+    // Session and photo writes use separate transactions so we never await
+    // inside an active transaction — Safari auto-commits if the request queue
+    // goes empty between microtasks.
+    const sessionId = await new Promise((resolve, reject) => {
+      const tx = db.transaction('sessions', 'readwrite');
+      const req = tx.objectStore('sessions').add({
+        object_id: objId,
+        date_taken: document.getElementById('form-date').value || null,
+        integration_minutes: Math.round(hrs * 60) + mins,
+        telescope: document.getElementById('form-telescope').value.trim(),
+        camera:    document.getElementById('form-camera').value.trim(),
+        notes:     document.getElementById('form-notes').value.trim(),
+        created_at: new Date().toISOString(),
+      });
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
 
-    for (const { thumbnailBlob, displayBlob, original_name, is_primary } of photoData) {
-      await rq(tx.objectStore('photos').add({
-        session_id: sessionId, thumbnailBlob, displayBlob,
-        original_name, is_primary, created_at: new Date().toISOString()
-      }));
+    if (photoData.length > 0) {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      for (const { thumbnailBlob, displayBlob, original_name, is_primary } of photoData) {
+        store.add({
+          session_id: sessionId, thumbnailBlob, displayBlob,
+          original_name, is_primary, created_at: new Date().toISOString()
+        });
+      }
+      await txDone(tx);
     }
-    await txDone(tx);
 
     toast('Session saved!');
     await Promise.all([loadPhotos(), loadObjects()]);
     loadStats(); updateHeaderStats(); resetForm(); navigate('gallery');
   } catch (err) {
     console.error(err);
-    toast('Failed to save. Please try again.', 'error');
+    const msg = err?.message || err?.name || String(err);
+    toast('Save failed: ' + msg, 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Save Session';
   }
