@@ -1050,10 +1050,11 @@ async function renderLightbox() {
   document.getElementById('lb-prev').disabled = S.lbIdx === 0;
   document.getElementById('lb-next').disabled = S.lbIdx === total - 1;
 
-  // Load full image blob on demand
+  // Load display blob on demand (falls back to thumbnail for old records)
   if (!p._imageUrl) {
     const record = await getById('photos', p.id);
-    if (record?.imageBlob) p._imageUrl = URL.createObjectURL(record.imageBlob);
+    const blob = record?.displayBlob || record?.thumbnailBlob;
+    if (blob) p._imageUrl = URL.createObjectURL(blob);
   }
   if (p._imageUrl) document.getElementById('lb-img').src = p._imageUrl;
 
@@ -1317,8 +1318,8 @@ async function submitSession(e) {
     const mins = parseInt(document.getElementById('form-mins').value)  || 0;
     const photoData = await Promise.all(
       S.pendingFiles.map(async (file, i) => ({
-        file,
-        thumbnailBlob: await makeThumbnail(file),
+        thumbnailBlob: await makeThumbnail(file, 600),
+        displayBlob:   await makeThumbnail(file, 1920),
         original_name: file.name,
         is_primary: i === 0 ? 1 : 0,
       }))
@@ -1337,9 +1338,9 @@ async function submitSession(e) {
       created_at: new Date().toISOString(),
     }));
 
-    for (const { file, thumbnailBlob, original_name, is_primary } of photoData) {
+    for (const { thumbnailBlob, displayBlob, original_name, is_primary } of photoData) {
       await rq(tx.objectStore('photos').add({
-        session_id: sessionId, imageBlob: file, thumbnailBlob,
+        session_id: sessionId, thumbnailBlob, displayBlob,
         original_name, is_primary, created_at: new Date().toISOString()
       }));
     }
