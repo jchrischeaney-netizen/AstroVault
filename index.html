@@ -1315,8 +1315,17 @@ async function submitSession(e) {
   try {
     const hrs  = parseFloat(document.getElementById('form-hours').value) || 0;
     const mins = parseInt(document.getElementById('form-mins').value)  || 0;
-    const db   = await openDB();
-    const tx   = db.transaction(['sessions', 'photos'], 'readwrite');
+    const photoData = await Promise.all(
+      S.pendingFiles.map(async (file, i) => ({
+        file,
+        thumbnailBlob: await makeThumbnail(file),
+        original_name: file.name,
+        is_primary: i === 0 ? 1 : 0,
+      }))
+    );
+
+    const db = await openDB();
+    const tx = db.transaction(['sessions', 'photos'], 'readwrite');
 
     const sessionId = await rq(tx.objectStore('sessions').add({
       object_id: objId,
@@ -1328,11 +1337,11 @@ async function submitSession(e) {
       created_at: new Date().toISOString(),
     }));
 
-    let first = true;
-    for (const file of S.pendingFiles) {
-      const thumbnailBlob = await makeThumbnail(file);
-      await rq(tx.objectStore('photos').add({ session_id: sessionId, imageBlob: file, thumbnailBlob, original_name: file.name, is_primary: first ? 1 : 0, created_at: new Date().toISOString() }));
-      first = false;
+    for (const { file, thumbnailBlob, original_name, is_primary } of photoData) {
+      await rq(tx.objectStore('photos').add({
+        session_id: sessionId, imageBlob: file, thumbnailBlob,
+        original_name, is_primary, created_at: new Date().toISOString()
+      }));
     }
     await txDone(tx);
 
