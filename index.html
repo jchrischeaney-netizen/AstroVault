@@ -740,9 +740,12 @@ function makeThumbnail(file, maxSize = 600) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('canvas.toBlob returned null'));
+      }, 'image/jpeg', 0.85);
     };
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('Image failed to load: ' + file.name));
     img.src = url;
   });
 }
@@ -1050,10 +1053,11 @@ async function renderLightbox() {
   document.getElementById('lb-prev').disabled = S.lbIdx === 0;
   document.getElementById('lb-next').disabled = S.lbIdx === total - 1;
 
-  // Load full image blob on demand
+  // Load display blob on demand (falls back to thumbnail for old records)
   if (!p._imageUrl) {
     const record = await getById('photos', p.id);
-    if (record?.imageBlob) p._imageUrl = URL.createObjectURL(record.imageBlob);
+    const blob = record?.displayBlob || record?.thumbnailBlob;
+    if (blob) p._imageUrl = URL.createObjectURL(blob);
   }
   if (p._imageUrl) document.getElementById('lb-img').src = p._imageUrl;
 
@@ -1315,33 +1319,54 @@ async function submitSession(e) {
   try {
     const hrs  = parseFloat(document.getElementById('form-hours').value) || 0;
     const mins = parseInt(document.getElementById('form-mins').value)  || 0;
-    const db   = await openDB();
-    const tx   = db.transaction(['sessions', 'photos'], 'readwrite');
+    const photoData = await Promise.all(
+      S.pendingFiles.map(async (file, i) => ({
+        thumbnailBlob: await makeThumbnail(file, 600),
+        displayBlob:   await makeThumbnail(file, 1920),
+        original_name: file.name,
+        is_primary: i === 0 ? 1 : 0,
+      }))
+    );
 
-    const sessionId = await rq(tx.objectStore('sessions').add({
-      object_id: objId,
-      date_taken: document.getElementById('form-date').value || null,
-      integration_minutes: Math.round(hrs * 60) + mins,
-      telescope: document.getElementById('form-telescope').value.trim(),
-      camera:    document.getElementById('form-camera').value.trim(),
-      notes:     document.getElementById('form-notes').value.trim(),
-      created_at: new Date().toISOString(),
-    }));
+    const db = await openDB();
 
-    let first = true;
-    for (const file of S.pendingFiles) {
-      const thumbnailBlob = await makeThumbnail(file);
-      await rq(tx.objectStore('photos').add({ session_id: sessionId, imageBlob: file, thumbnailBlob, original_name: file.name, is_primary: first ? 1 : 0, created_at: new Date().toISOString() }));
-      first = false;
+    // Session and photo writes use separate transactions so we never await
+    // inside an active transaction — Safari auto-commits if the request queue
+    // goes empty between microtasks.
+    const sessionId = await new Promise((resolve, reject) => {
+      const tx = db.transaction('sessions', 'readwrite');
+      const req = tx.objectStore('sessions').add({
+        object_id: objId,
+        date_taken: document.getElementById('form-date').value || null,
+        integration_minutes: Math.round(hrs * 60) + mins,
+        telescope: document.getElementById('form-telescope').value.trim(),
+        camera:    document.getElementById('form-camera').value.trim(),
+        notes:     document.getElementById('form-notes').value.trim(),
+        created_at: new Date().toISOString(),
+      });
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror   = e => reject(e.target.error);
+    });
+
+    if (photoData.length > 0) {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      for (const { thumbnailBlob, displayBlob, original_name, is_primary } of photoData) {
+        store.add({
+          session_id: sessionId, thumbnailBlob, displayBlob,
+          original_name, is_primary, created_at: new Date().toISOString()
+        });
+      }
+      await txDone(tx);
     }
-    await txDone(tx);
 
     toast('Session saved!');
     await Promise.all([loadPhotos(), loadObjects()]);
     loadStats(); updateHeaderStats(); resetForm(); navigate('gallery');
   } catch (err) {
     console.error(err);
-    toast('Failed to save. Please try again.', 'error');
+    const msg = err?.message || err?.name || String(err);
+    toast('Save failed: ' + msg, 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Save Session';
   }
