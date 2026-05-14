@@ -282,9 +282,23 @@ main {
   .lb-img-wrap { gap: 6px; padding: 60px 6px 120px; }
   .lb-arrow { width: 36px; height: 36px; font-size: 1.3rem; }
 }
+
+/* ── Global loading overlay ── */
+#global-loading {
+  display: none; position: fixed; inset: 0; background: var(--bg);
+  z-index: 9999; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+}
+.spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
+
+<div id="global-loading"><div class="spinner"></div><div style="color:var(--dim);font-size:.85rem">Loading…</div></div>
 
 <header>
   <div class="logo">&#9880; Astro<span>Vault</span></div>
@@ -496,9 +510,6 @@ main {
 </nav>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-// CATALOG DATA
-// ═══════════════════════════════════════════════════════════════
 const MESSIER_CATALOG = [
   [1,1952,"Crab Nebula","Supernova Remnant","Taurus"],
   [2,7089,null,"Globular Cluster","Aquarius"],
@@ -654,109 +665,23 @@ const NGC_EXTRA_CATALOG = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
-// INDEXEDDB LAYER
+// API HELPERS
 // ═══════════════════════════════════════════════════════════════
-const DB_NAME = 'AstroVaultDB', DB_VER = 1;
-let _db = null;
-
-function openDB() {
-  if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = ({ target: { result: db } }) => {
-      if (!db.objectStoreNames.contains('objects')) {
-        const os = db.createObjectStore('objects', { keyPath: 'id', autoIncrement: true });
-        os.createIndex('by_messier', 'messier_number');
-        os.createIndex('by_ngc', 'ngc_number');
-      }
-      if (!db.objectStoreNames.contains('sessions')) {
-        const ss = db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
-        ss.createIndex('by_object', 'object_id');
-      }
-      if (!db.objectStoreNames.contains('photos')) {
-        const ps = db.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
-        ps.createIndex('by_session', 'session_id');
-      }
-    };
-    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
-    req.onerror = e => reject(e.target.error);
-  });
-}
-
-function rq(idbRequest) {
-  return new Promise((resolve, reject) => {
-    idbRequest.onsuccess = e => resolve(e.target.result);
-    idbRequest.onerror  = e => reject(e.target.error);
-  });
-}
-
-async function getAllFrom(storeName, indexName, query) {
-  const db = await openDB();
-  const tx = db.transaction(storeName, 'readonly');
-  const store = tx.objectStore(storeName);
-  const target = indexName ? store.index(indexName) : store;
-  return rq(query !== undefined ? target.getAll(query) : target.getAll());
-}
-
-async function getById(storeName, id) {
-  const db = await openDB();
-  return rq(db.transaction(storeName, 'readonly').objectStore(storeName).get(id));
-}
-
-function txDone(tx) {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = resolve;
-    tx.onerror = tx.onabort = e => reject(e.target.error);
-  });
-}
-
-async function seedCatalog() {
-  const db = await openDB();
-  const count = await rq(db.transaction('objects').objectStore('objects').count());
-  if (count > 0) return;
-  const tx = db.transaction('objects', 'readwrite');
-  const store = tx.objectStore('objects');
-  for (const [m, n, name, type, con] of MESSIER_CATALOG)
-    store.add({ messier_number: m, ngc_number: n, common_name: name, object_type: type, constellation: con, notes: null });
-  for (const [n, name, type, con] of NGC_EXTRA_CATALOG)
-    store.add({ messier_number: null, ngc_number: n, common_name: name, object_type: type, constellation: con, notes: null });
-  await txDone(tx);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// THUMBNAIL GENERATION
-// ═══════════════════════════════════════════════════════════════
-function makeThumbnail(file, maxSize = 600) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let w = img.naturalWidth, h = img.naturalHeight;
-      if (w > maxSize || h > maxSize) {
-        const r = Math.min(maxSize / w, maxSize / h);
-        w = Math.round(w * r); h = Math.round(h * r);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => {
-        if (blob) resolve(blob);
-        else reject(new Error('canvas.toBlob returned null'));
-      }, 'image/jpeg', 0.85);
-    };
-    img.onerror = () => reject(new Error('Image failed to load: ' + file.name));
-    img.src = url;
-  });
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
 }
 
 // ═══════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════
 const S = {
-  photos: [],    // { id, session_id, _thumbUrl, _imageUrl?, original_name, is_primary, object_id, ... }
-  objects: [],   // { id, messier_number, ..., session_count, photo_count, total_minutes, last_imaged }
-  sessions: [],  // raw session records for stats
+  photos: [],   // { id, session_id, _thumbUrl, _imageUrl, original_name, is_primary, object_id, ... }
+  objects: [],  // { id, messier_number, ..., session_count, photo_count, total_minutes, last_imaged }
   stats: null,
   objStatus: 'all',
   objType: '',
@@ -765,15 +690,20 @@ const S = {
   currentObjId: null,
 };
 
-let _modalThumbUrls = []; // blob URLs created just for the modal
-
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
+function showLoading(on) {
+  document.getElementById('global-loading').style.display = on ? 'flex' : 'none';
+}
+
 async function init() {
-  await seedCatalog();
-  await Promise.all([loadPhotos(), loadObjects()]);
-  loadStats();
+  showLoading(true);
+  try {
+    await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
+  } finally {
+    showLoading(false);
+  }
   renderDash();
   renderGallery();
   updateHeaderStats();
@@ -801,112 +731,26 @@ function navigate(view, skipHash) {
 // DATA LOADING
 // ═══════════════════════════════════════════════════════════════
 async function loadPhotos() {
-  // Revoke old blob URLs
-  S.photos.forEach(p => {
-    if (p._thumbUrl) URL.revokeObjectURL(p._thumbUrl);
-    if (p._imageUrl) URL.revokeObjectURL(p._imageUrl);
-  });
-
-  const [allPhotos, allSessions, allObjects] = await Promise.all([
-    getAllFrom('photos'), getAllFrom('sessions'), getAllFrom('objects'),
-  ]);
-
-  const sessionMap = new Map(allSessions.map(s => [s.id, s]));
-  const objectMap  = new Map(allObjects.map(o => [o.id, o]));
-
-  S.photos = allPhotos.map(p => {
-    const session = sessionMap.get(p.session_id) || {};
-    const object  = objectMap.get(session.object_id) || {};
-    return {
-      id: p.id,
-      session_id: p.session_id,
-      _thumbUrl: p.thumbnailBlob ? URL.createObjectURL(p.thumbnailBlob) : null,
-      original_name: p.original_name,
-      is_primary: p.is_primary,
-      object_id: object.id,
-      messier_number: object.messier_number,
-      ngc_number: object.ngc_number,
-      common_name: object.common_name,
-      object_type: object.object_type,
-      constellation: object.constellation,
-      date_taken: session.date_taken,
-      integration_minutes: session.integration_minutes,
-      telescope: session.telescope,
-      camera: session.camera,
-    };
-  }).sort((a, b) => (b.date_taken || '').localeCompare(a.date_taken || '') || b.id - a.id);
+  const { photos } = await apiFetch('/api/gallery');
+  S.photos = photos.map(p => ({ ...p, _thumbUrl: p.thumbnail_url, _imageUrl: p.image_url }));
 }
 
 async function loadObjects() {
-  const [allObjects, allSessions, allPhotos] = await Promise.all([
-    getAllFrom('objects'), getAllFrom('sessions'), getAllFrom('photos'),
-  ]);
-
-  S.sessions = allSessions;
-
-  S.objects = allObjects.map(o => {
-    const objSessions = allSessions.filter(s => s.object_id === o.id);
-    const sessionIds  = new Set(objSessions.map(s => s.id));
-    const totalMinutes = objSessions.reduce((acc, s) => acc + (s.integration_minutes || 0), 0);
-    const photoCount   = allPhotos.filter(p => sessionIds.has(p.session_id)).length;
-    const dates = objSessions.map(s => s.date_taken).filter(Boolean).sort();
-    return { ...o, session_count: objSessions.length, photo_count: photoCount, total_minutes: totalMinutes, last_imaged: dates[dates.length - 1] || null };
-  }).sort((a, b) => {
-    if (a.messier_number != null && b.messier_number != null) return a.messier_number - b.messier_number;
-    if (a.messier_number != null) return -1;
-    if (b.messier_number != null) return 1;
-    if (a.ngc_number != null && b.ngc_number != null) return a.ngc_number - b.ngc_number;
-    return 0;
-  });
+  const { objects } = await apiFetch('/api/objects');
+  S.objects = objects;
 }
 
-function loadStats() {
-  const messierObjs = S.objects.filter(o => o.messier_number != null);
-  const messierDone = messierObjs.filter(o => o.session_count > 0).length;
-  const totalMinutes = S.sessions.reduce((sum, s) => sum + (s.integration_minutes || 0), 0);
-
-  const typeMap = {};
-  S.objects.filter(o => o.session_count > 0).forEach(o => {
-    if (o.object_type) typeMap[o.object_type] = (typeMap[o.object_type] || 0) + 1;
-  });
-  const byType = Object.entries(typeMap).map(([type, count]) => ({ type, count })).sort((a,b) => b.count - a.count);
-
-  const recentSessions = [...S.sessions]
-    .sort((a, b) => (b.date_taken || b.created_at || '').localeCompare(a.date_taken || a.created_at || ''))
-    .slice(0, 6)
-    .map(s => {
-      const obj = S.objects.find(o => o.id === s.object_id) || {};
-      const primaryPhoto = S.photos.find(p => p.session_id === s.id && p.is_primary);
-      return { ...s, object_id: obj.id, messier_number: obj.messier_number, ngc_number: obj.ngc_number, common_name: obj.common_name, object_type: obj.object_type, constellation: obj.constellation, thumbnail: primaryPhoto?._thumbUrl || null };
-    });
-
-  S.stats = { messier_total: messierObjs.length, messier_done: messierDone, total_minutes: totalMinutes, total_sessions: S.sessions.length, total_photos: S.photos.length, by_type: byType, recent_sessions: recentSessions };
+async function loadStats() {
+  S.stats = await apiFetch('/api/stats');
 }
 
 async function getObjectDetail(id) {
-  const obj = await getById('objects', id);
-  const sessions_raw = await getAllFrom('sessions', 'by_object', IDBKeyRange.only(id));
-  sessions_raw.sort((a, b) => (b.date_taken || '').localeCompare(a.date_taken || ''));
-
-  _modalThumbUrls.forEach(u => URL.revokeObjectURL(u));
-  _modalThumbUrls = [];
-
-  const sessions = await Promise.all(sessions_raw.map(async s => {
-    const photos_raw = await getAllFrom('photos', 'by_session', IDBKeyRange.only(s.id));
-    photos_raw.sort((a, b) => b.is_primary - a.is_primary);
-    const photos = photos_raw.map(p => {
-      const cached = S.photos.find(x => x.id === p.id);
-      let thumbUrl = cached?._thumbUrl;
-      if (!thumbUrl && p.thumbnailBlob) {
-        thumbUrl = URL.createObjectURL(p.thumbnailBlob);
-        _modalThumbUrls.push(thumbUrl);
-      }
-      return { id: p.id, session_id: p.session_id, original_name: p.original_name, is_primary: p.is_primary, _thumbUrl: thumbUrl };
-    });
-    return { ...s, photos };
+  const data = await apiFetch('/api/objects/' + id);
+  data.sessions = data.sessions.map(s => ({
+    ...s,
+    photos: s.photos.map(p => ({ ...p, _thumbUrl: p.thumbnail_url })),
   }));
-
-  return { ...obj, sessions };
+  return data;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1053,12 +897,6 @@ async function renderLightbox() {
   document.getElementById('lb-prev').disabled = S.lbIdx === 0;
   document.getElementById('lb-next').disabled = S.lbIdx === total - 1;
 
-  // Load display blob on demand (falls back to thumbnail for old records)
-  if (!p._imageUrl) {
-    const record = await getById('photos', p.id);
-    const blob = record?.displayBlob || record?.thumbnailBlob;
-    if (blob) p._imageUrl = URL.createObjectURL(blob);
-  }
   if (p._imageUrl) document.getElementById('lb-img').src = p._imageUrl;
 
   const meta = [
@@ -1190,8 +1028,6 @@ async function openObjModal(id) {
 
 function closeObjModal(e) {
   if (e && e.target !== document.getElementById('obj-modal')) return;
-  _modalThumbUrls.forEach(u => URL.revokeObjectURL(u));
-  _modalThumbUrls = [];
   document.getElementById('obj-modal').classList.add('hidden');
   document.body.style.overflow = '';
 }
@@ -1206,26 +1042,15 @@ async function openLightboxFromModal(objId, photoIdx) {
 
 async function deleteSession(sessionId) {
   if (!confirm('Delete this session and all its photos?')) return;
-  const sessionPhotos = await getAllFrom('photos', 'by_session', IDBKeyRange.only(sessionId));
-
-  // Revoke blob URLs
-  sessionPhotos.forEach(p => {
-    const cached = S.photos.find(x => x.id === p.id);
-    if (cached?._thumbUrl) URL.revokeObjectURL(cached._thumbUrl);
-    if (cached?._imageUrl) URL.revokeObjectURL(cached._imageUrl);
-  });
-
-  const db = await openDB();
-  const tx = db.transaction(['sessions', 'photos'], 'readwrite');
-  sessionPhotos.forEach(p => tx.objectStore('photos').delete(p.id));
-  tx.objectStore('sessions').delete(sessionId);
-  await txDone(tx);
-
-  toast('Session deleted');
-  await Promise.all([loadPhotos(), loadObjects()]);
-  loadStats();
-  updateHeaderStats();
-  openObjModal(S.currentObjId);
+  try {
+    await apiFetch('/api/sessions/' + sessionId, { method: 'DELETE' });
+    toast('Session deleted');
+    await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
+    updateHeaderStats();
+    openObjModal(S.currentObjId);
+  } catch (err) {
+    toast('Delete failed: ' + err.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1273,15 +1098,22 @@ async function addNewObject() {
     common_name:    document.getElementById('new-name').value.trim() || null,
     object_type:    document.getElementById('new-type').value,
     constellation:  document.getElementById('new-const').value.trim() || null,
-    notes: null,
   };
   if (!payload.messier_number && !payload.ngc_number && !payload.common_name) { toast('Please enter at least one identifier.', 'error'); return; }
-  const db = await openDB();
-  const id = await rq(db.transaction('objects', 'readwrite').objectStore('objects').add(payload));
-  await loadObjects(); loadStats(); updateHeaderStats();
-  selectObj(id);
-  document.getElementById('new-obj-form').classList.remove('open');
-  toast('Object added');
+  try {
+    const { id } = await apiFetch('/api/objects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await Promise.all([loadObjects(), loadStats()]);
+    updateHeaderStats();
+    selectObj(id);
+    document.getElementById('new-obj-form').classList.remove('open');
+    toast('Object added');
+  } catch (err) {
+    toast('Failed to add object: ' + err.message, 'error');
+  }
 }
 
 function prefillObj(id) { setTimeout(() => { selectObj(id); document.getElementById('form-date').value = new Date().toISOString().split('T')[0]; }, 50); }
@@ -1310,7 +1142,7 @@ function renderPreview() {
 
 async function submitSession(e) {
   e.preventDefault();
-  const objId = parseInt(document.getElementById('form-object-id').value);
+  const objId = document.getElementById('form-object-id').value;
   if (!objId) { toast('Please select a target object.', 'error'); return; }
 
   const btn = document.getElementById('submit-btn');
@@ -1319,54 +1151,24 @@ async function submitSession(e) {
   try {
     const hrs  = parseFloat(document.getElementById('form-hours').value) || 0;
     const mins = parseInt(document.getElementById('form-mins').value)  || 0;
-    const photoData = await Promise.all(
-      S.pendingFiles.map(async (file, i) => ({
-        thumbnailBlob: await makeThumbnail(file, 600),
-        displayBlob:   await makeThumbnail(file, 1920),
-        original_name: file.name,
-        is_primary: i === 0 ? 1 : 0,
-      }))
-    );
 
-    const db = await openDB();
+    const formData = new FormData();
+    formData.append('object_id', objId);
+    formData.append('date_taken', document.getElementById('form-date').value || '');
+    formData.append('integration_minutes', Math.round(hrs * 60) + mins);
+    formData.append('telescope', document.getElementById('form-telescope').value.trim());
+    formData.append('camera',    document.getElementById('form-camera').value.trim());
+    formData.append('notes',     document.getElementById('form-notes').value.trim());
+    S.pendingFiles.forEach(f => formData.append('photos', f));
 
-    // Session and photo writes use separate transactions so we never await
-    // inside an active transaction — Safari auto-commits if the request queue
-    // goes empty between microtasks.
-    const sessionId = await new Promise((resolve, reject) => {
-      const tx = db.transaction('sessions', 'readwrite');
-      const req = tx.objectStore('sessions').add({
-        object_id: objId,
-        date_taken: document.getElementById('form-date').value || null,
-        integration_minutes: Math.round(hrs * 60) + mins,
-        telescope: document.getElementById('form-telescope').value.trim(),
-        camera:    document.getElementById('form-camera').value.trim(),
-        notes:     document.getElementById('form-notes').value.trim(),
-        created_at: new Date().toISOString(),
-      });
-      req.onsuccess = e => resolve(e.target.result);
-      req.onerror   = e => reject(e.target.error);
-    });
-
-    if (photoData.length > 0) {
-      const tx = db.transaction('photos', 'readwrite');
-      const store = tx.objectStore('photos');
-      for (const { thumbnailBlob, displayBlob, original_name, is_primary } of photoData) {
-        store.add({
-          session_id: sessionId, thumbnailBlob, displayBlob,
-          original_name, is_primary, created_at: new Date().toISOString()
-        });
-      }
-      await txDone(tx);
-    }
+    await apiFetch('/api/sessions', { method: 'POST', body: formData });
 
     toast('Session saved!');
-    await Promise.all([loadPhotos(), loadObjects()]);
-    loadStats(); updateHeaderStats(); resetForm(); navigate('gallery');
+    await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
+    updateHeaderStats(); resetForm(); navigate('gallery');
   } catch (err) {
     console.error(err);
-    const msg = err?.message || err?.name || String(err);
-    toast('Save failed: ' + msg, 'error');
+    toast('Save failed: ' + (err.message || String(err)), 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Save Session';
   }

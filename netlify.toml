@@ -2,6 +2,9 @@
   publish = "."
   command = ""
 
+[functions]
+  directory = "netlify/functions"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -12,3 +15,39 @@
   for = "/*"
   [headers.values]
     X-Frame-Options = "SAMEORIGIN"
+
+# More-specific paths must come before catch-all routes
+[[redirects]]
+  from = "/api/objects/:id"
+  to = "/.netlify/functions/api-object-detail"
+  status = 200
+
+[[redirects]]
+  from = "/api/objects"
+  to = "/.netlify/functions/api-objects"
+  status = 200
+
+[[redirects]]
+  from = "/api/gallery"
+  to = "/.netlify/functions/api-gallery"
+  status = 200
+
+[[redirects]]
+  from = "/api/stats"
+  to = "/.netlify/functions/api-stats"
+  status = 200
+
+[[redirects]]
+  from = "/api/sessions/:id"
+  to = "/.netlify/functions/api-delete-session"
+  status = 200
+
+[[redirects]]
+  from = "/api/sessions"
+  to = "/.netlify/functions/api-create-session"
+  status = 200
+
+[[redirects]]
+  from = "/api/photos/:id"
+  to = "/.netlify/functions/api-delete-photo"
+  status = 200
