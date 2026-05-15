@@ -1,9 +1,9 @@
-const { neon } = require('@netlify/neon');
+const { getDatabase } = require('@netlify/database');
 
-let _sql;
+let _db;
 function getDb() {
-  if (!_sql) _sql = neon();
-  return _sql;
+  if (!_db) _db = getDatabase();
+  return _db;
 }
 
 module.exports = { getDb };

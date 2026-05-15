@@ -1,7 +1,7 @@
 // Run once to seed the objects catalog: node db/seed.js
 // Requires NETLIFY_DATABASE_URL (or DATABASE_URL) to be set in the environment.
 // Pull it locally with: netlify env:pull .env.local && node --env-file=.env.local db/seed.js
-const { neon } = require('@netlify/neon');
+const { getDatabase } = require('@netlify/database');
 
 const MESSIER_CATALOG = [
   [1,1952,'Crab Nebula','Supernova Remnant','Taurus'],
@@ -158,9 +158,9 @@ const NGC_EXTRA_CATALOG = [
 ];
 
 async function seed() {
-  const sql = neon(process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL);
+  const db = getDatabase();
 
-  const [{ count }] = await sql`SELECT COUNT(*)::int AS count FROM objects`;
+  const [{ count }] = await db.sql`SELECT COUNT(*)::int AS count FROM objects`;
   if (count > 0) {
     console.log(`Already seeded (${count} objects). Skipping.`);
     return;
@@ -168,13 +168,13 @@ async function seed() {
 
   console.log('Seeding catalog...');
   for (const [m, n, name, type, con] of MESSIER_CATALOG) {
-    await sql`
+    await db.sql`
       INSERT INTO objects (messier_number, ngc_number, common_name, object_type, constellation)
       VALUES (${m}, ${n}, ${name}, ${type}, ${con})
     `;
   }
   for (const [n, name, type, con] of NGC_EXTRA_CATALOG) {
-    await sql`
+    await db.sql`
       INSERT INTO objects (messier_number, ngc_number, common_name, object_type, constellation)
       VALUES (NULL, ${n}, ${name}, ${type}, ${con})
     `;

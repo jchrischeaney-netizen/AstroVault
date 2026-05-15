@@ -3,8 +3,8 @@ const { thumbUrl, imageUrl } = require('./lib/blobs');
 
 exports.handler = async () => {
   try {
-    const sql = getDb();
-    const rows = await sql`
+    const db = getDb();
+    const rows = await db.sql`
       SELECT
         p.id, p.session_id, p.blob_key, p.original_name, p.is_primary,
         s.object_id, s.date_taken, s.integration_minutes, s.telescope, s.camera,

@@ -10,13 +10,13 @@ exports.handler = async (event) => {
     const id = parseInt(event.path.split('/').pop());
     if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'Missing photo id' }) };
 
-    const sql = getDb();
+    const db = getDb();
     const store = getPhotosStore();
 
-    const [photo] = await sql`SELECT blob_key FROM photos WHERE id = ${id}`;
+    const [photo] = await db.sql`SELECT blob_key FROM photos WHERE id = ${id}`;
     if (!photo) return { statusCode: 404, body: JSON.stringify({ error: 'Not found' }) };
 
-    await sql`DELETE FROM photos WHERE id = ${id}`;
+    await db.sql`DELETE FROM photos WHERE id = ${id}`;
     await store.delete(photo.blob_key).catch(() => {});
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
