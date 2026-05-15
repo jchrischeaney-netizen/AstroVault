@@ -2,7 +2,7 @@ const { neon } = require('@netlify/neon');
 
 let _sql;
 function getDb() {
-  if (!_sql) _sql = neon(process.env.DATABASE_URL);
+  if (!_sql) _sql = neon();
   return _sql;
 }
 

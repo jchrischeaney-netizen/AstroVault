@@ -1,5 +1,6 @@
 // Run once to seed the objects catalog: node db/seed.js
-// Requires DATABASE_URL to be set in the environment.
+// Requires NETLIFY_DATABASE_URL (or DATABASE_URL) to be set in the environment.
+// Pull it locally with: netlify env:pull .env.local && node --env-file=.env.local db/seed.js
 const { neon } = require('@netlify/neon');
 
 const MESSIER_CATALOG = [
@@ -157,7 +158,7 @@ const NGC_EXTRA_CATALOG = [
 ];
 
 async function seed() {
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = neon(process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL);
 
   const [{ count }] = await sql`SELECT COUNT(*)::int AS count FROM objects`;
   if (count > 0) {
