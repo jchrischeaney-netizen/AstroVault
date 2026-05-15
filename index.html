@@ -701,6 +701,9 @@ async function init() {
   showLoading(true);
   try {
     await Promise.all([loadPhotos(), loadObjects(), loadStats()]);
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    toast('Could not connect to database: ' + (err.message || String(err)), 'error');
   } finally {
     showLoading(false);
   }

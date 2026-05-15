@@ -1,5 +1,4 @@
 const busboy = require('busboy');
-const { Readable } = require('stream');
 const { randomUUID } = require('crypto');
 const path = require('path');
 const { getDb } = require('./lib/db');
@@ -30,7 +29,10 @@ function parseMultipart(event) {
     const body = event.isBase64Encoded
       ? Buffer.from(event.body, 'base64')
       : Buffer.from(event.body || '');
-    Readable.from(body).pipe(bb);
+    // bb.end(body) writes the buffer directly to busboy as a single chunk.
+    // Readable.from(buffer) would iterate the buffer byte-by-byte in object
+    // mode, which breaks busboy's multipart parser.
+    bb.end(body);
   });
 }
 
