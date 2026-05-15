@@ -3,20 +3,20 @@ const { thumbUrl } = require('./lib/blobs');
 
 exports.handler = async (event) => {
   try {
-    const sql = getDb();
+    const db = getDb();
     // Extract id from path: /api/objects/42 → 42
     const id = parseInt(event.path.split('/').pop());
     if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'Missing id' }) };
 
-    const [obj] = await sql`SELECT * FROM objects WHERE id = ${id}`;
+    const [obj] = await db.sql`SELECT * FROM objects WHERE id = ${id}`;
     if (!obj) return { statusCode: 404, body: JSON.stringify({ error: 'Not found' }) };
 
-    const sessions_raw = await sql`
+    const sessions_raw = await db.sql`
       SELECT * FROM sessions WHERE object_id = ${id} ORDER BY date_taken DESC NULLS LAST
     `;
 
     const sessions = await Promise.all(sessions_raw.map(async s => {
-      const photos_raw = await sql`
+      const photos_raw = await db.sql`
         SELECT id, session_id, blob_key, original_name, is_primary
         FROM photos WHERE session_id = ${s.id} ORDER BY is_primary DESC
       `;

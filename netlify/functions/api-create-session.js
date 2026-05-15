@@ -46,11 +46,11 @@ exports.handler = async (event) => {
     const object_id = parseInt(fields.object_id);
     if (!object_id) return { statusCode: 400, body: JSON.stringify({ error: 'object_id required' }) };
 
-    const sql = getDb();
+    const db = getDb();
     const store = getPhotosStore();
 
     // Insert session
-    const [session] = await sql`
+    const [session] = await db.sql`
       INSERT INTO sessions (object_id, date_taken, integration_minutes, telescope, camera, notes)
       VALUES (
         ${object_id},
@@ -73,7 +73,7 @@ exports.handler = async (event) => {
       const blobKey = `photos/${randomUUID()}${ext}`;
       await store.set(blobKey, f.buffer, { metadata: { contentType: f.mimetype } });
 
-      await sql`
+      await db.sql`
         INSERT INTO photos (session_id, blob_key, original_name, is_primary)
         VALUES (${session.id}, ${blobKey}, ${f.filename}, ${i === 0 ? 1 : 0})
       `;

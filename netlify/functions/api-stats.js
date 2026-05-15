@@ -3,10 +3,10 @@ const { thumbUrl } = require('./lib/blobs');
 
 exports.handler = async () => {
   try {
-    const sql = getDb();
+    const db = getDb();
 
     // Messier progress
-    const [{ messier_total, messier_done }] = await sql`
+    const [{ messier_total, messier_done }] = await db.sql`
       SELECT
         COUNT(*)::int FILTER (WHERE messier_number IS NOT NULL)                    AS messier_total,
         COUNT(DISTINCT s.object_id)::int FILTER (WHERE o.messier_number IS NOT NULL) AS messier_done
@@ -15,7 +15,7 @@ exports.handler = async () => {
     `;
 
     // Totals
-    const [{ total_sessions, total_minutes, total_photos }] = await sql`
+    const [{ total_sessions, total_minutes, total_photos }] = await db.sql`
       SELECT
         COUNT(DISTINCT s.id)::int   AS total_sessions,
         COALESCE(SUM(s.integration_minutes), 0)::int AS total_minutes,
@@ -25,7 +25,7 @@ exports.handler = async () => {
     `;
 
     // Object-type breakdown (only objects with sessions)
-    const by_type = await sql`
+    const by_type = await db.sql`
       SELECT o.object_type AS type, COUNT(DISTINCT o.id)::int AS count
       FROM objects o
       JOIN sessions s ON s.object_id = o.id
@@ -35,7 +35,7 @@ exports.handler = async () => {
     `;
 
     // Recent 6 sessions
-    const recent_raw = await sql`
+    const recent_raw = await db.sql`
       SELECT
         s.id, s.object_id, s.date_taken, s.integration_minutes,
         o.messier_number, o.ngc_number, o.common_name, o.object_type, o.constellation
@@ -46,7 +46,7 @@ exports.handler = async () => {
     `;
 
     const recent_sessions = await Promise.all(recent_raw.map(async s => {
-      const [primary] = await sql`
+      const [primary] = await db.sql`
         SELECT blob_key FROM photos
         WHERE session_id = ${s.id} AND is_primary = 1
         LIMIT 1

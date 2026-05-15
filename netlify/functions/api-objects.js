@@ -1,7 +1,7 @@
 const { getDb } = require('./lib/db');
 
 exports.handler = async (event) => {
-  const sql = getDb();
+  const db = getDb();
 
   if (event.httpMethod === 'POST') {
     try {
@@ -10,7 +10,7 @@ exports.handler = async (event) => {
       if (!messier_number && !ngc_number && !common_name) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Provide at least one identifier.' }) };
       }
-      const [obj] = await sql`
+      const [obj] = await db.sql`
         INSERT INTO objects (messier_number, ngc_number, common_name, object_type, constellation, notes)
         VALUES (${messier_number || null}, ${ngc_number || null}, ${common_name || null},
                 ${object_type || null}, ${constellation || null}, NULL)
@@ -29,7 +29,7 @@ exports.handler = async (event) => {
 
   // GET — return all objects with aggregated stats
   try {
-    const objects = await sql`
+    const objects = await db.sql`
       SELECT
         o.id, o.messier_number, o.ngc_number, o.common_name, o.object_type, o.constellation, o.notes,
         COUNT(DISTINCT s.id)::int       AS session_count,
